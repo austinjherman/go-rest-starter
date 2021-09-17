@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+
+  aherman_api:
+    # environment:
+    #   - GOOS=darwin
+    image: golang:1.16.6
+    volumes: 
+      - .:/go/src/uma
+    working_dir: /go/src/uma
