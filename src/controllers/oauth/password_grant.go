@@ -92,7 +92,11 @@ func PasswordGrant(app *container.Container) gin.HandlerFunc {
 		}
 
 		c.JSON(response.Success(
-			struct{ AccessToken string `json:"access_token"` }{ AccessToken: tokenString },
+			struct {
+				AccessToken string `json:"access_token"`
+			}{
+				AccessToken: tokenString,
+			},
 			response.SuccessCreate,
 		))
 

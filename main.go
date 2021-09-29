@@ -45,7 +45,10 @@ func main() {
 
 	r.POST("/oauth/token", oauthControllers.PasswordGrant(dependencies))
 
-	r.POST("/users/create", middleware.Invitation(), userControllers.Create(dependencies))
+	r.POST("/user/create", middleware.Invitation(), userControllers.Create(dependencies))
+	r.GET("/user/read", middleware.Token(*dependencies), userControllers.Read(dependencies))
+	r.POST("/user/update", middleware.Token(*dependencies), userControllers.Update(dependencies))
+	r.POST("/user/delete", middleware.Token(*dependencies), userControllers.Delete(dependencies))
 
 	r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 }

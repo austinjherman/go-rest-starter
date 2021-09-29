@@ -10,7 +10,7 @@ import (
 
 // Env todo
 type Env struct {
-	User User
+	Current *User
 	DB *gorm.DB
 }
 
