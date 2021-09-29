@@ -2,10 +2,11 @@ version: "3.8"
 
 services:
 
-  aherman_api:
+  aherman:
     # environment:
     #   - GOOS=darwin
-    image: golang:1.16.6
+    image: golang:1.17.1
     volumes: 
-      - .:/go/src/uma
-    working_dir: /go/src/uma
+      - .:/go/src/aherman
+      - ./.gocache:/go
+    working_dir: /go/src/aherman
