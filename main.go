@@ -12,9 +12,11 @@ import (
 	userModels "aherman/src/models/user"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/ttacon/chalk"
 )
 
 func main() {
@@ -23,8 +25,11 @@ func main() {
 	// todo: error handling
   err := godotenv.Load(".env")
   if err != nil {
-    log.Fatalf("Error loading .env file")
-  }
+    log.Printf("%swarn%s no environment file found\n", chalk.Yellow, chalk.Reset)
+  } else {
+		dir, _ := os.Getwd()
+		log.Printf("%sinfo%s loading env file %s/.env\n", chalk.Blue, chalk.Reset, dir)
+	}
 
 	// todo: error handling
 	db := database.Init()
