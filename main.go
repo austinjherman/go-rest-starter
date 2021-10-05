@@ -1,14 +1,15 @@
 package main
 
 import (
+	"aherman/src/container"
 	oauthControllers "aherman/src/controllers/oauth"
 	userControllers "aherman/src/controllers/user"
 	"aherman/src/database"
+	tokenFacades "aherman/src/facades/token"
+	userFacades "aherman/src/facades/user"
 	"aherman/src/middleware"
-	clientModels "aherman/src/models/client"
-	oauthModels "aherman/src/models/oauth"
+	tokenModels "aherman/src/models/token"
 	userModels "aherman/src/models/user"
-	"aherman/src/types/container"
 	"log"
 	"net/http"
 
@@ -30,9 +31,12 @@ func main() {
 
 	// create a container for dependency injection
 	dependencies := &container.Container{
-		Client: &clientModels.Env{DB: db},
-		OAuth: &oauthModels.Env{DB: db},
-		User: &userModels.Env{DB: db},
+		Current: &container.CurrentContainer{
+			Token: &tokenModels.Token{},
+			User: &userModels.User{},
+		},
+		Token: &tokenFacades.Token{DB: db},
+		User: &userFacades.User{DB: db},
 	}
 
 	r := gin.Default()
@@ -43,12 +47,14 @@ func main() {
 		})
 	})
 
-	r.POST("/oauth/token", oauthControllers.PasswordGrant(dependencies))
+	r.POST("/oauth/token", oauthControllers.Router(dependencies))
 
-	r.POST("/user/create", middleware.Invitation(), userControllers.Create(dependencies))
-	r.GET("/user/read", middleware.Token(*dependencies), userControllers.Read(dependencies))
-	r.POST("/user/update", middleware.Token(*dependencies), userControllers.Update(dependencies))
-	r.POST("/user/delete", middleware.Token(*dependencies), userControllers.Delete(dependencies))
+	r.GET("/logout", middleware.Token(dependencies), userControllers.Logout(dependencies))
+
+	r.POST("/user", middleware.Invitation(), userControllers.Create(dependencies))
+	r.GET("/user", middleware.Token(dependencies), userControllers.Read(dependencies))
+	r.PUT("/user", middleware.Token(dependencies), userControllers.Update(dependencies))
+	r.DELETE("/user", middleware.Token(dependencies), userControllers.Delete(dependencies))
 
 	r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 }

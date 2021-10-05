@@ -1,9 +1,9 @@
 package user
 
 import (
+	"aherman/src/container"
 	"aherman/src/http/response"
 	u "aherman/src/models/user"
-	"aherman/src/types/container"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,11 +13,11 @@ func Read(app *container.Container) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		var (
-			user       *u.User = app.User.Current
+			user       *u.User = app.Current.User
 			userPublic *u.Public = &u.Public{}
 		)
 
 		userPublic.BindAttributes(user)
-		c.JSON(response.Success(userPublic, response.SuccessRead))
+		c.JSON(response.Success(response.SuccessRead, userPublic))
 	}
 }

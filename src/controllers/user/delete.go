@@ -3,7 +3,7 @@ package user
 import (
 	"aherman/src/http/response"
 	userModels "aherman/src/models/user"
-	"aherman/src/types/container"
+	"aherman/src/container"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,8 +13,8 @@ func Delete(app *container.Container) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		var (
-			user       *userModels.User = app.User.Current
-			userPublic *userModels.Public
+			user       *userModels.User   = app.Current.User
+			userPublic *userModels.Public = &userModels.Public{}
 		)
 
 		userPublic.BindAttributes(user)
@@ -23,12 +23,10 @@ func Delete(app *container.Container) gin.HandlerFunc {
 
 		if result.Error != nil {
 			c.Error(result.Error)
-			res := response.ErrDatabase
-			c.JSON(response.Error(res))
+			c.JSON(response.Error(result.Error))
 			return
 		}
 
-		c.JSON(response.Success(userPublic, response.SuccessDelete))
-
+		c.JSON(response.Success(response.SuccessDelete, userPublic))
 	}
 }

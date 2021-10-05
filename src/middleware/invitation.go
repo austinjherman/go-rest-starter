@@ -3,8 +3,6 @@ package middleware
 import (
 	"aherman/src/enums"
 	"aherman/src/http/response"
-	"errors"
-	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -42,9 +40,9 @@ func Invitation() gin.HandlerFunc {
 			return
 		}
 
-		if request.InvitationCode != os.Getenv(enums.InvitationCodeEnvironmentKey) {
+		if request.InvitationCode != enums.InvitationCode {
 			res := response.ErrNoInvitation
-			c.Error(errors.New("Incorrect invitation code"))
+			c.Error(res)
 			c.AbortWithStatusJSON(res.Status, res)
 			return
 		}

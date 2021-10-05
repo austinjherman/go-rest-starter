@@ -4,110 +4,141 @@ import (
 	"net/http"
 )
 
-// ErrorMsg represents the structure of errors as they occur in the application.
-type ErrorMsg struct {
+// ClientSafeErrorMsg represents an error that is safe to return to the client.
+// We shouldn't use this to expose any database or application-level errors;
+// instead, this is intended to be used for providing information to the client.
+// ErrorMsg implements the Error interface.
+type ClientSafeErrorMsg struct {
 	OK          bool   `json:"ok"`
 	Status      int    `json:"status"`
 	Description string `json:"description"`
 }
 
-func (err ErrorMsg) Error() string {
+// Error returns a string so ErrorMsg implements the Error interface.
+func (err ClientSafeErrorMsg) Error() string {
 	return err.Description
 }
 
-// Error TODO
-func Error(err error) (int, ErrorMsg) {
-	// This the best way to log?
-	// trace := make([]byte, 1024)
-	// runtime.Stack(trace, true)
-	// log.Printf("ERROR: %s\n%s", err, trace)
-	if apiError, ok := err.(ErrorMsg); ok {
+// Error checks to see if the provided error is of the ErrorMsg type.
+// If it is, then we can safely return the error to the client. If it's 
+// not, this is more likely a deeper application issue that we'll mask 
+// by returning ErrUnknown.
+func Error(err error) (int, ClientSafeErrorMsg) {
+	if apiError, ok := err.(ClientSafeErrorMsg); ok {
 		return apiError.Status, apiError
 	}
-
+	
 	return ErrUnknown.Status, ErrUnknown
 }
 
-// ErrBadCredentials TODO
-var ErrBadCredentials ErrorMsg = ErrorMsg{
+// ErrAccessTokenInvalid TODO
+var ErrAccessTokenInvalid ClientSafeErrorMsg = ClientSafeErrorMsg{
 	OK:          false,
 	Status:      http.StatusUnauthorized,
-	Description: "Your credentials are incorrect.",
+	Description: "Invalid access token",
+}
+
+// ErrAccessTokenExpired TODO
+var ErrAccessTokenExpired ClientSafeErrorMsg = ClientSafeErrorMsg{
+	OK:          false,
+	Status:      http.StatusUnauthorized,
+	Description: "Expired access token",
+}
+
+// ErrAccessTokenParse TODO
+var ErrAccessTokenParse ClientSafeErrorMsg = ClientSafeErrorMsg{
+	OK:          false,
+	Status:      http.StatusInternalServerError,
+	Description: "Error parsing token",
+}
+
+// ErrBadCredentials TODO
+var ErrBadCredentials ClientSafeErrorMsg = ClientSafeErrorMsg{
+	OK:          false,
+	Status:      http.StatusUnauthorized,
+	Description: "Invalid credentials",
 }
 
 // ErrBadRequest TODO
-var ErrBadRequest ErrorMsg = ErrorMsg{
+var ErrBadRequest ClientSafeErrorMsg = ClientSafeErrorMsg{
 	OK:          false,
 	Status:      http.StatusBadRequest,
-	Description: "You've made a bad request.",
-}
-
-// ErrDatabase TODO
-var ErrDatabase ErrorMsg = ErrorMsg{
-	OK:          false,
-	Status:      http.StatusInternalServerError,
-	Description: "An internal server error occured.",
+	Description: "Bad request",
 }
 
 // ErrEmailNotAvailable TODO
-var ErrEmailNotAvailable ErrorMsg = ErrorMsg{
+var ErrEmailNotAvailable ClientSafeErrorMsg = ClientSafeErrorMsg{
 	OK:          false,
 	Status:      http.StatusBadRequest,
-	Description: "That email address is already registered.",
+	Description: "Email address already registered",
 }
 
 // ErrEmailNotFound TODO
-var ErrEmailNotFound ErrorMsg = ErrorMsg{
+var ErrEmailNotFound ClientSafeErrorMsg = ClientSafeErrorMsg{
 	OK:          false,
 	Status:      http.StatusNotFound,
-	Description: "The provided email address could not be found.",
+	Description: "Email address not found",
+}
+
+// ErrInvalidPassword TODO
+var ErrInvalidPassword ClientSafeErrorMsg = ClientSafeErrorMsg{
+	OK:          false,
+	Status:      http.StatusUnauthorized,
+	Description: "Invalid password",
+}
+
+// ErrLogout TODO
+var ErrLogout ClientSafeErrorMsg = ClientSafeErrorMsg{
+	OK:          false,
+	Status:      http.StatusInternalServerError,
+	Description: "Could not log out",
 }
 
 // ErrNoInvitation TODO
-var ErrNoInvitation ErrorMsg = ErrorMsg{
+var ErrNoInvitation ClientSafeErrorMsg = ClientSafeErrorMsg{
 	OK:          false,
-	Status:      http.StatusNotFound,
-	Description: "You need an invitation code to use this application.",
+	Status:      http.StatusUnauthorized,
+	Description: "Invitation code required",
+}
+
+// ErrNotATrustedClient TODO
+var ErrNotATrustedClient ClientSafeErrorMsg = ClientSafeErrorMsg{
+	OK:          false,
+	Status:      http.StatusUnauthorized,
+	Description: "Only trusted clients can request this resource",
 }
 
 // ErrNotFound TODO
-var ErrNotFound ErrorMsg = ErrorMsg{
+var ErrNotFound ClientSafeErrorMsg = ClientSafeErrorMsg{
 	OK:          false,
 	Status:      http.StatusNotFound,
-	Description: "The requested resource could not be found.",
+	Description: "Not found",
 }
 
-// ErrUserLoggedIn TODO
-var ErrUserLoggedIn ErrorMsg = ErrorMsg{
+// ErrNotImplemented TODO
+var ErrNotImplemented ClientSafeErrorMsg = ClientSafeErrorMsg{
 	OK:          false,
-	Status:      http.StatusBadRequest,
-	Description: "This user is already logged in.",
+	Status:      http.StatusNotImplemented,
+	Description: "Not implemented",
 }
 
 // ErrValidation TODO
-var ErrValidation ErrorMsg = ErrorMsg{
+var ErrValidation ClientSafeErrorMsg = ClientSafeErrorMsg{
 	OK:          false,
 	Status:      http.StatusBadRequest,
-	Description: "A validation error occurred.",
+	Description: "A validation error occurred",
 }
 
 // ErrUnauthorized TODO
-var ErrUnauthorized ErrorMsg = ErrorMsg{
+var ErrUnauthorized ClientSafeErrorMsg = ClientSafeErrorMsg{
 	OK:          false,
 	Status:      http.StatusUnauthorized,
-	Description: "You need to be logged in.",
+	Description: "Unauthorized",
 }
 
 // ErrUnknown TODO
-var ErrUnknown ErrorMsg = ErrorMsg{
+var ErrUnknown ClientSafeErrorMsg = ClientSafeErrorMsg{
 	OK:          false,
 	Status:      http.StatusInternalServerError,
-	Description: "An unknown error occured.",
-}
-
-// ErrUsernameNotAvailable TODO
-var ErrUsernameNotAvailable ErrorMsg = ErrorMsg{
-	OK:          false,
-	Status:      http.StatusBadRequest,
-	Description: "That username is already in use.",
+	Description: "An unknown error occured",
 }

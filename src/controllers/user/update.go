@@ -1,9 +1,9 @@
 package user
 
 import (
+	"aherman/src/container"
 	"aherman/src/http/response"
 	u "aherman/src/models/user"
-	"aherman/src/types/container"
 	"aherman/src/util"
 
 	"github.com/gin-gonic/gin"
@@ -15,21 +15,29 @@ func Update(app *container.Container) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		var (
-			user           *u.User = app.User.Current
-			userUpdateable *u.Updateable
-			userPublic     *u.Public
+			user           *u.User = app.Current.User
+			userUpdateable *u.Updateable = &u.Updateable{}
+			userPublic     *u.Public = &u.Public{}
 		)
 
 		// bind input to user variable.
 		// if we can't, there was a validation error.
 		if err := c.ShouldBindBodyWith(userUpdateable, binding.JSON); err != nil {
+			c.Error(err)
 			res := response.ErrValidation
-			c.Error(res)
+			res.Description = err.Error()
 			c.JSON(response.Error(res))
 			return
 		}
 
 		if userUpdateable.Email != "" {
+			err := app.User.EmailIsAvailable(userUpdateable.Email)
+			if err != nil {
+				c.Error(err)
+				c.JSON(response.Error(err))
+				return
+			}
+
 			user.Email = userUpdateable.Email
 		}
 
@@ -38,15 +46,19 @@ func Update(app *container.Container) gin.HandlerFunc {
 			user.Password, err = util.HashPassword(userUpdateable.Password)
 			if err != nil {
 				c.Error(err)
-				res := response.ErrUnknown
-				c.JSON(response.Error(res))
+				c.JSON(response.Error(err))
 				return
 			}
 		}
 
-		app.User.DB.Save(user)
+		result := app.User.DB.Save(user)
+		if result.Error != nil {
+			c.Error(result.Error)
+			c.JSON(response.Error(result.Error))
+			return
+		}
 
 		userPublic.BindAttributes(user)
-		c.JSON(response.Success(userPublic, response.SuccessRead))
+		c.JSON(response.Success(response.SuccessUpdate, userPublic))
 	}
 }

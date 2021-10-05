@@ -1,6 +1,7 @@
 package database
 
 import (
+	tokenModels "aherman/src/models/token"
 	userModels "aherman/src/models/user"
 	"fmt"
 	"os"
@@ -17,6 +18,7 @@ func Init() *gorm.DB {
 	}
 
 	// Migrate the schema
+  db.AutoMigrate(&tokenModels.Token{})
   db.AutoMigrate(&userModels.User{})
 	
 	return db

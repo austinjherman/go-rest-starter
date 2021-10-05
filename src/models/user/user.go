@@ -2,18 +2,35 @@ package user
 
 import (
 	"aherman/src/models/base"
+	tokenModels "aherman/src/models/token"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+var (
+	// TokensFieldName should match the field name for user tokens
+	TokensFieldName string = "Tokens"
 )
 
 // User represents a user of the application.
 // Should never be made publicly available.
 type User struct {
 	base.Model
-	Name     string `json:"-"`
-	Email    string `json:"-" gorm:"unique_index:user_email_index"`
+	Name string `json:"-"`
+	Email string `json:"-" gorm:"unique_index:user_email_index"`
 	Password string `json:"-" gorm:"size:72"`
+
+	// foreign key will be Token.ID
+	Tokens []tokenModels.Token `json:"-"`
+}
+
+// BeforeCreate is a GORM lifecycle method that will run before a user
+// is created in the database.
+func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
+  u.ID = uuid.New()
+  return nil
 }
 
 // Creatable represents what's needed to successfully
@@ -34,6 +51,9 @@ type Credentials struct {
 // We add jwt.StandardClaims as an embedded type, to provide fields like expiry time.
 type JWTClaims struct {
 	ID uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+	SessionID string `json:"session_id"`
+	TokenType string `json:"token_type"`
 	jwt.StandardClaims
 }
 

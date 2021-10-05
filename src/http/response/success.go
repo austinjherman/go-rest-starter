@@ -11,7 +11,7 @@ type SucessMsg struct {
 }
 
 // Success TODO
-func Success(data interface{}, msg SucessMsg) (int, SucessMsg) {
+func Success(msg SucessMsg, data interface{}) (int, SucessMsg) {
 	msg.Data = data
 	return msg.Status, msg
 }
@@ -34,7 +34,14 @@ var SuccessDelete SucessMsg = SucessMsg{
 var SuccessLogin SucessMsg = SucessMsg{
 	OK:          true,
 	Status:      http.StatusOK,
-	Description: "You've succesfully logged in.",
+	Description: "Authentication successful",
+}
+
+// SuccessLogout TODO
+var SuccessLogout SucessMsg = SucessMsg{
+	OK:          true,
+	Status:      http.StatusOK,
+	Description: "Log out successful",
 }
 
 // SuccessRead TODO
