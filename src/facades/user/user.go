@@ -1,10 +1,17 @@
+/**************************************************************************************
+  User Facade
+	-------------
+	The user facade has access to the user database connection. It is passed as a
+	dependency to all controllers. With it, we can abstract some of the logic out of
+	the controllers and handle it here.
+**************************************************************************************/
+
 package user
 
 import (
 	"aherman/src/http/response"
 	tokenModels "aherman/src/models/token"
 	userModels "aherman/src/models/user"
-	"errors"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -15,62 +22,34 @@ type User struct {
 	DB *gorm.DB
 }
 
-// EmailIsAvailable checks to see if the user's email is already registered.
-func (env *User) EmailIsAvailable(email string) error {
-	var u userModels.User
-	// safe because this inline query is escaped by GORM / database/sql
-	// https://gorm.io/it_IT/docs/security.html
-	if result := env.DB.First(&u, "email = ?", email); result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil
-		}
+
+/**************************************************************************************
+  Private Helper Functions
+**************************************************************************************/
+
+// get binds a user by the query and args or returns an error
+func (env *User) get(user *userModels.User, query interface{}, args ...interface{}) error {
+
+	// run the query
+	result := env.DB.Model(&userModels.User{}).
+		Where(query, args...).
+		Find(&user)
+	
+	if result.Error != nil {
 		return result.Error
 	}
-	if u.ID != uuid.Nil {
-		return response.ErrEmailNotAvailable
-	}
+
 	return nil
 }
 
-// FindByEmail todo
-func (env *User) FindByEmail(email string) (*userModels.User, error) {
-	var u userModels.User
-	// safe because this inline query is escaped by GORM / database/sql
-	// https://gorm.io/it_IT/docs/security.html
-	result := env.DB.Limit(1).Find(&u, "email = ?", email)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	if u.ID == uuid.Nil {
-		return nil, response.ErrEmailNotFound
-	}
-	return &u, nil
-}
-
-// FindByID todo
-func (env *User) FindByID(id uuid.UUID) (*userModels.User, error) {
-	var u userModels.User
-	// safe because this inline query is escaped by GORM / database/sql
-	// https://gorm.io/it_IT/docs/security.html
-	result := env.DB.Limit(1).Find(&u, "id = ?", id.String())
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	if u.ID == uuid.Nil {
-		return nil, response.ErrNotFound
-	}
-	return &u, nil
-}
-
-// RevokeSession todo
-func (env *User) RevokeSession(userID uuid.UUID, sessionID string) error {
-
+// revoke tokens will revoke a user's tokens by query and args
+func (env *User) revokeTokens(query interface{}, args ...interface{}) error {
 	// tokens array for binding
 	tokens := []tokenModels.Token{}
 
 	// query for tokens with matching user_id and session_id
 	result := env.DB.Model(&tokenModels.Token{}).
-		Where("user_id = ? AND session_id = ?", userID, sessionID).
+		Where(query, args...).
 		Find(&tokens)
 
 	if result.Error != nil {
@@ -90,6 +69,63 @@ func (env *User) RevokeSession(userID uuid.UUID, sessionID string) error {
 	}
 
 	return nil
+}
+
+
+/**************************************************************************************
+  Public Functions
+**************************************************************************************/
+
+// BindByEmail binds user the email or returns an error
+func (env *User) BindByEmail(user *userModels.User, email string) error {
+	err := env.get(user, "email = ?", email)
+	if err != nil {
+		return err
+	}
+	if user.ID == uuid.Nil {
+		return response.ErrUserNotFound
+	}
+	return nil
+}
+
+// BindByID binds user by id or returns an error
+func (env *User) BindByID(user *userModels.User, id string) error {
+	err := env.get(user, "id = ?", id)
+	if err != nil {
+		return err
+	}
+	if user.ID == uuid.Nil {
+		return response.ErrUserNotFound
+	}
+	return nil
+}
+
+// EmailIsAvailable checks whether or not an email is available
+func (env *User) EmailIsAvailable(email string) error {
+	user := &userModels.User{}
+	err := env.get(user, "email = ?", email)
+	if err != nil {
+		return err
+	}
+	if user.ID != uuid.Nil {
+		return response.ErrUserEmailAlreadyRegistered
+	}
+	return nil
+}
+
+// RevokeTokenByID todo
+func (env *User) RevokeTokenByID(tokenID string) error {
+	return env.revokeTokens("id = ?", tokenID)
+}
+
+// RevokeTokensBySession todo
+func (env *User) RevokeTokensBySession(userID uuid.UUID, sessionID string) error {
+	return env.revokeTokens("user_id = ? AND session_id = ?", userID, sessionID)
+}
+
+// RevokeTokensByUser todo
+func (env *User) RevokeTokensByUser(userID uuid.UUID) error {
+	return env.revokeTokens("user_id = ?", userID)
 }
 
 // WhitelistTokens todo

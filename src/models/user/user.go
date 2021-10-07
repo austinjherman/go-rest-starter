@@ -4,7 +4,6 @@ import (
 	"aherman/src/models/base"
 	tokenModels "aherman/src/models/token"
 
-	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -47,16 +46,6 @@ type Credentials struct {
 	Password string `json:"password" binding:"required,min=8"`
 }
 
-// JWTClaims is a struct that will be encoded to a JWT.
-// We add jwt.StandardClaims as an embedded type, to provide fields like expiry time.
-type JWTClaims struct {
-	ID uuid.UUID `json:"id"`
-	UserID uuid.UUID `json:"user_id"`
-	SessionID string `json:"session_id"`
-	TokenType string `json:"token_type"`
-	jwt.StandardClaims
-}
-
 // Public represents the user object that is publicly
 // available
 type Public struct {
@@ -77,6 +66,8 @@ type Readable struct {
 
 // Updateable represents the fields available for updating
 type Updateable struct {
-	Email    string `json:"email" binding:"email"`
-	Password string `json:"password" binding:"min=8"`
+	Email string `json:"email" binding:"email"`
+	PasswordNew string `json:"password_new" binding:"min=8"`
+	PasswordNewConfirmation string `json:"password_new_confirmation" binding:"required_with=password_new,eqfield=pasword_new"`
+	PasswordOld string `json:"password_old" binding:"min=8,required_with=password_new"`
 }

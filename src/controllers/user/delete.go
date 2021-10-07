@@ -1,9 +1,9 @@
 package user
 
 import (
+	"aherman/src/container"
 	"aherman/src/http/response"
 	userModels "aherman/src/models/user"
-	"aherman/src/container"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,11 +19,10 @@ func Delete(app *container.Container) gin.HandlerFunc {
 
 		userPublic.BindAttributes(user)
 
-		result := app.User.DB.Delete(&userModels.User{}, user.ID)
-
-		if result.Error != nil {
-			c.Error(result.Error)
-			c.JSON(response.Error(result.Error))
+		result := app.Facades.User.DB.Delete(&userModels.User{}, user.ID)
+		ok, httpRequest := app.Facades.Error.ShouldContinue(result.Error, &response.ErrUnknown)
+		if !ok {
+			c.JSON(response.Error(httpRequest))
 			return
 		}
 

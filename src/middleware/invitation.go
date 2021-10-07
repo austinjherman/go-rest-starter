@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"aherman/src/container"
 	"aherman/src/enums"
 	"aherman/src/http/response"
 
@@ -14,36 +15,27 @@ type invitationRequest struct {
 
 // Invitation is a middleware that requires the invitation code
 // be provided in the JSON request
-func Invitation() gin.HandlerFunc {
+func Invitation(app *container.Container) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		
-		// todo: should move this to it's own middleware
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
 
-		request := invitationRequest{}
-		err := c.ShouldBindBodyWith(&request, binding.JSON)
+		request := &invitationRequest{}
 
-		if err != nil {
-			res := response.ErrUnknown
-			c.Error(res)
-			c.AbortWithStatusJSON(res.Status, res)
+		err := c.ShouldBindBodyWith(request, binding.JSON)
+		ok, httpResponse := app.Facades.Error.ShouldContinue(err, &response.ErrValidation)
+		if !ok {
+			c.AbortWithStatusJSON(httpResponse.Status, httpResponse)
 			return
 		}
 
 		if request.InvitationCode == "" {
-			res := response.ErrNoInvitation
-			c.Error(res)
-			c.AbortWithStatusJSON(res.Status, res)
+			httpResponse := response.ErrInvitationCodeInvalid
+			c.AbortWithStatusJSON(httpResponse.Status, httpResponse)
 			return
 		}
 
 		if request.InvitationCode != enums.InvitationCode {
-			res := response.ErrNoInvitation
-			c.Error(res)
-			c.AbortWithStatusJSON(res.Status, res)
+			httpResponse := response.ErrInvitationCodeInvalid
+			c.AbortWithStatusJSON(httpResponse.Status, httpResponse)
 			return
 		}
 

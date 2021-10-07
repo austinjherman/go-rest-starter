@@ -4,12 +4,14 @@ import (
 	"aherman/src/container"
 	"aherman/src/enums"
 	"aherman/src/http/response"
+	tokenModels "aherman/src/models/token"
 	userModels "aherman/src/models/user"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/golang-jwt/jwt"
 )
 
@@ -17,100 +19,103 @@ type authorizationHeader struct {
 	Authorization string `header:"Authorization"`
 }
 
-// Token is a middleware that requires a JWT web token to proceed
-// with the request
+// Token is a middleware that requires a valid JWT 
+// to proceed with the request
 func Token(app *container.Container) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		var (
 			bearer *authorizationHeader = &authorizationHeader{}
-			claims *userModels.JWTClaims = &userModels.JWTClaims{}
+			claims *tokenModels.JWTClaims = &tokenModels.JWTClaims{}
+			jwtToken *jwt.Token = &jwt.Token{}
+			token *tokenModels.Token = &tokenModels.Token{}
+			user *userModels.User = &userModels.User{}
 		)
 
-		// validate header
-		err := c.ShouldBindHeader(bearer)
-		if err != nil {
-			c.Error(err)
-			res := response.ErrUnknown
-			c.AbortWithStatusJSON(res.Status, res)
+		// validate authorization header
+		err := c.ShouldBindWith(bearer, binding.Header)
+		ok, httpResponse := app.Facades.Error.ShouldContinue(err, &response.ErrValidation)
+		if !ok {
+			c.AbortWithStatusJSON(httpResponse.Status, httpResponse)
 			return
 		}
 
-		// split bearer header
-		bearerHeader := strings.Split(bearer.Authorization, "Bearer ")
-		if len(bearerHeader) != 2 {
-			res := response.ErrAccessTokenInvalid
-			c.AbortWithStatusJSON(res.Status, res)
+		// split authorization header value, i.e. from Bearer xxx to ["Bearer", "xxx"]
+		bearerHeader := strings.Split(bearer.Authorization, " ")
+		if len(bearerHeader) != 2 || bearerHeader[0] != "Bearer" {
+			httpResponse := response.ErrTokenInvalid
+			c.AbortWithStatusJSON(httpResponse.Status, httpResponse)
 			return
 		}
 
-		// validate token
-
-		// for debugging
-		// jwt.TimeFunc = func () time.Time {return time.Now().Add(24 * time.Hour)}
-		
-		token, err := jwt.ParseWithClaims(bearerHeader[1], claims, func(t *jwt.Token) (interface{}, error) {
-			// Don't forget to validate the alg is what you expect:
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				res := response.ErrAccessTokenInvalid
-				res.Description = fmt.Sprintf("Unexpected signing method: %v", t.Header["alg"])
-				return nil, res
-			}
-			return []byte(enums.AppSecret), nil
-		})
-		if err != nil {
-			c.Error(err)
-			res := response.ErrAccessTokenParse
-			c.AbortWithStatusJSON(res.Status, res)
+		// validate the token
+		jwtToken, err = app.Facades.Token.ParseWithClaims(bearerHeader[1], claims)
+		ok, httpResponse = app.Facades.Error.ShouldContinue(err, &response.ErrTokenInvalid)
+		if !ok {
+			c.AbortWithStatusJSON(httpResponse.Status, httpResponse)
 			return
 		}
 
 		// find the user
-		user, err := app.User.FindByID(claims.UserID)
-		if err != nil {
-			c.Error(err)
-			res := response.ErrAccessTokenInvalid
-			c.AbortWithStatusJSON(res.Status, res)
+		err = app.Facades.User.BindByID(user, claims.Subject)
+		ok, httpResponse = app.Facades.Error.ShouldContinue(err, &response.ErrUserNotFound)
+		if !ok {
+			c.AbortWithStatusJSON(httpResponse.Status, httpResponse)
 			return
 		}
 
-		// explicitly check for expiry
+		// explicitly check for expiry for both refresh and access types
+		// remove if expired
 		now := time.Now()
 		tokenExpiry := time.Unix(claims.ExpiresAt, 0)
+
+		// if expiry is before now
 		if tokenExpiry.Before(now) {
-			res := response.ErrAccessTokenExpired
-			c.Error(res)
-			c.AbortWithStatusJSON(res.Status, res)
+			// revoke the token
+			app.Facades.User.RevokeTokenByID(claims.ID.String())
+
+			// respond
+			httpResponse := response.ErrTokenExpired
+			// serverErr := logging.NewServerError(err).BindClientErr(httpResponse)
+			// c.Error(serverErr)
+			c.AbortWithStatusJSON(httpResponse.Status, httpResponse)
 			return
 		}
 
-		// explicitly check for refresh token type
-		// we'll disallow on this route
-		// also all other errors
-		if !token.Valid || claims.TokenType != enums.JWTTokenTypeAccess {
-			res := response.ErrAccessTokenInvalid
-			c.AbortWithStatusJSON(res.Status, res)
+		// We'll only allow the access token flow in this middleware. If the user has
+		// a refresh token, they should go through a different flow. For example, exchanging
+		// their refresh token for a new access token.
+		if claims.TokenType != enums.JWTTokenTypeAccess {
+			httpResponse := response.ErrTokenTypeInvalid
+			// serverErr := logging.NewServerError(nil).BindClientErr(httpResponse)
+			// c.Error(serverErr)
+			c.AbortWithStatusJSON(httpResponse.Status, httpResponse)
+			return
+		}
+
+		// We'll disallow invalid tokens, too.
+		if !jwtToken.Valid {
+			fmt.Println("here it is")
+			httpResponse := response.ErrTokenInvalid
+			c.AbortWithStatusJSON(httpResponse.Status, httpResponse)
 			return
 		}
 
 		// lastly we'll check to see if the token is in the whitelist
-		ok, err := app.Token.InWhitelist(claims.ID)
+		err = app.Facades.Token.BindByID(token, claims.ID)
 		if err != nil {
-			res := response.ErrAccessTokenInvalid
-			c.AbortWithStatusJSON(res.Status, res)
-			return
-		}
-		if !ok {
-			res := response.ErrAccessTokenInvalid
-			c.AbortWithStatusJSON(res.Status, res)
+			httpResponse := response.ErrTokenNotFound
+			// serverErr := logging.NewServerError(err).BindClientErr(httpResponse)
+			// c.Error(serverErr)
+			c.AbortWithStatusJSON(httpResponse.Status, httpResponse)
 			return
 		}
 
 		// store user in the handler dependencies
 		app.Current.User = user
 
-		// store the session id so we can revoke tokens related to the session
-		app.Current.Token.SessionID = claims.SessionID
+		// store the token so we can revoke tokens related to the session
+		app.Current.Token = token
 
 		c.Next()
 	}

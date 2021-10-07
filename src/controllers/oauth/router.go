@@ -17,11 +17,10 @@ func Router(app *container.Container) gin.HandlerFunc {
 		incoming := &oauthModels.RouterRequest{}
 
 		// bind input. if we can't, there was a validation error.
-		if err := c.ShouldBindBodyWith(incoming, binding.JSON); err != nil {
-			c.Error(err)
-			res := response.ErrValidation
-			res.Description = err.Error()
-			c.AbortWithStatusJSON(res.Status, res)
+		err := c.ShouldBindBodyWith(incoming, binding.JSON)
+		ok, httpResponse := app.Facades.Error.ShouldContinue(err, &response.ErrValidation)
+		if !ok {
+			c.JSON(response.Error(httpResponse))
 			return
 		}
 
@@ -31,6 +30,6 @@ func Router(app *container.Container) gin.HandlerFunc {
 		}
 
 		res := response.ErrNotImplemented
-		c.AbortWithStatusJSON(res.Status, res)
+		c.JSON(res.Status, res)
 	}
 }

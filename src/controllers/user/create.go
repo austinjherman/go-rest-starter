@@ -3,7 +3,7 @@ package user
 import (
 	"aherman/src/container"
 	"aherman/src/http/response"
-	u "aherman/src/models/user"
+	userModels "aherman/src/models/user"
 	"aherman/src/util"
 
 	"github.com/gin-gonic/gin"
@@ -15,42 +15,42 @@ func Create(app *container.Container) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		var (
-			user          u.User
-			userCreatable u.Creatable
-			userPublic    u.Public
+			user          userModels.User
+			userCreatable userModels.Creatable
+			userPublic    userModels.Public
 		)
 
-		// bind input to user variable.
-		// if we can't, there was a validation error.
-		if err := c.ShouldBindBodyWith(&userCreatable, binding.JSON); err != nil {
-			c.Error(err)
-			res := response.ErrValidation
-			res.Description = err.Error()
-			c.JSON(response.Error(res))
+		// validate user input
+		err := c.ShouldBindBodyWith(&userCreatable, binding.JSON)
+		ok, httpResponse := app.Facades.Error.ShouldContinue(err, &response.ErrValidation)
+		if !ok {
+			c.JSON(response.Error(httpResponse))
 			return
 		}
 
 		// check if email is available
-		if err := app.User.EmailIsAvailable(userCreatable.Email); err != nil {
-			c.Error(err)
-			c.JSON(response.Error(err))
+		err = app.Facades.User.EmailIsAvailable(userCreatable.Email)
+		ok, httpResponse = app.Facades.Error.ShouldContinue(err, &response.ErrUserEmailAlreadyRegistered)
+		if !ok {
+			c.JSON(response.Error(httpResponse))
 			return
 		}
 
 		// checks passed; create user
 		passwordHash, err := util.HashPassword(userCreatable.Password)
-		if err != nil {
-			c.Error(err)
-			c.JSON(response.Error(err))
+		ok, httpResponse = app.Facades.Error.ShouldContinue(err, &response.ErrUnknown)
+		if !ok {
+			c.JSON(response.Error(httpResponse))
 			return
 		}
 		
 		user.Email = userCreatable.Email
 		user.Password = passwordHash
 
-		if result := app.User.DB.Create(&user); result.Error != nil {
-			c.Error(result.Error)
-			c.JSON(response.Error(result.Error))
+		result := app.Facades.User.DB.Create(&user)
+		ok, httpResponse = app.Facades.Error.ShouldContinue(result.Error, &response.ErrUnknown)
+		if !ok {
+			c.JSON(response.Error(httpResponse))
 			return
 		}
 

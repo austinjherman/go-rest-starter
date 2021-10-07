@@ -1,6 +1,7 @@
 package token
 
 import (
+	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -14,7 +15,7 @@ type Token struct {
 	// UserID is the foreign key that ties a token to a user. This association allows
 	// us to create a token whitelist, which subsequently allows us to revoke all tokens
 	// or revoke tokens on behalf of a user.
-	UserID uuid.UUID
+	UserID uuid.UUID `gorm:"type:uuid;not null"`
 
 	SessionID string `gorm:"not null"`
 
@@ -38,4 +39,14 @@ func (t *Token) BeforeCreate(tx *gorm.DB) (err error) {
 // TableName provides GORM with a customized table name.
 func (Token) TableName() string {
 	return "token_whitelist"
+}
+
+
+// JWTClaims is a struct that will be encoded to a JWT.
+// We add jwt.StandardClaims as an embedded type, to provide fields like expiry time.
+type JWTClaims struct {
+	ID uuid.UUID `json:"id"`
+	SessionID string `json:"session_id"`
+	TokenType string `json:"token_type"`
+	jwt.StandardClaims
 }

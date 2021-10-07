@@ -22,39 +22,46 @@ func Update(app *container.Container) gin.HandlerFunc {
 
 		// bind input to user variable.
 		// if we can't, there was a validation error.
-		if err := c.ShouldBindBodyWith(userUpdateable, binding.JSON); err != nil {
-			c.Error(err)
-			res := response.ErrValidation
-			res.Description = err.Error()
-			c.JSON(response.Error(res))
+		err := c.ShouldBindBodyWith(userUpdateable, binding.JSON)
+		ok, httpResponse := app.Facades.Error.ShouldContinue(err, &response.ErrValidation)
+		if !ok {
+			c.JSON(response.Error(httpResponse))
 			return
 		}
 
+		// update email if not empty
 		if userUpdateable.Email != "" {
-			err := app.User.EmailIsAvailable(userUpdateable.Email)
-			if err != nil {
-				c.Error(err)
-				c.JSON(response.Error(err))
+			err := app.Facades.User.EmailIsAvailable(userUpdateable.Email)
+			ok, httpResponse := app.Facades.Error.ShouldContinue(err, &response.ErrUserEmailAlreadyRegistered)
+			if !ok {
+				c.JSON(response.Error(httpResponse))
 				return
 			}
 
 			user.Email = userUpdateable.Email
 		}
 
-		if userUpdateable.Password != "" {
-			var err error
-			user.Password, err = util.HashPassword(userUpdateable.Password)
-			if err != nil {
-				c.Error(err)
-				c.JSON(response.Error(err))
+		// update password if not empty
+		if userUpdateable.PasswordNew != "" {
+
+			if !util.PasswordIsValid(userUpdateable.PasswordOld, user.Password) {
+				httpResponse := response.ErrUserPasswordInvalid
+				c.JSON(response.Error(httpResponse))
+				return
+			}
+
+			user.Password, err = util.HashPassword(userUpdateable.PasswordNew)
+			ok, httpResponse := app.Facades.Error.ShouldContinue(err, &response.ErrUnknown)
+			if !ok {
+				c.JSON(response.Error(httpResponse))
 				return
 			}
 		}
 
-		result := app.User.DB.Save(user)
-		if result.Error != nil {
-			c.Error(result.Error)
-			c.JSON(response.Error(result.Error))
+		result := app.Facades.User.DB.Save(user)
+		ok, httpResponse = app.Facades.Error.ShouldContinue(result.Error, &response.ErrResourceNotUpdated)
+		if !ok {
+			c.JSON(response.Error(httpResponse))
 			return
 		}
 

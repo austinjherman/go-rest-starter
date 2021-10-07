@@ -1,8 +1,8 @@
 package oauth
 
 import (
-	"aherman/src/http/response"
 	"aherman/src/container"
+	"aherman/src/http/response"
 
 	"github.com/gin-gonic/gin"
 )

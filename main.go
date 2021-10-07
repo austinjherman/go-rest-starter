@@ -5,6 +5,7 @@ import (
 	oauthControllers "aherman/src/controllers/oauth"
 	userControllers "aherman/src/controllers/user"
 	"aherman/src/database"
+	errorFacades "aherman/src/facades/error"
 	tokenFacades "aherman/src/facades/token"
 	userFacades "aherman/src/facades/user"
 	"aherman/src/middleware"
@@ -40,11 +41,31 @@ func main() {
 			Token: &tokenModels.Token{},
 			User: &userModels.User{},
 		},
-		Token: &tokenFacades.Token{DB: db},
-		User: &userFacades.User{DB: db},
+		Facades: &container.Facades{
+			Error: &errorFacades.Error{},
+			Token: &tokenFacades.Token{
+				DB: db,
+			},
+			User: &userFacades.User{
+				DB: db,
+			},
+		},
 	}
 
 	r := gin.Default()
+
+	// Abort 204 options request
+	r.Use(
+		func(c *gin.Context) {
+			if c.Request.Method == "OPTIONS" {
+				c.AbortWithStatus(204)
+				return
+			}
+		},
+		func(c *gin.Context) {
+			dependencies.Facades.Error.ServerWriter = gin.DefaultErrorWriter
+		},
+	)
 
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -53,10 +74,12 @@ func main() {
 	})
 
 	r.POST("/oauth/token", oauthControllers.Router(dependencies))
+	r.GET("/oauth/refresh", oauthControllers.RefreshForAccess(dependencies))
 
 	r.GET("/logout", middleware.Token(dependencies), userControllers.Logout(dependencies))
+	r.GET("/logout-all", middleware.Token(dependencies), userControllers.LogoutAll(dependencies))
 
-	r.POST("/user", middleware.Invitation(), userControllers.Create(dependencies))
+	r.POST("/user", middleware.Invitation(dependencies), userControllers.Create(dependencies))
 	r.GET("/user", middleware.Token(dependencies), userControllers.Read(dependencies))
 	r.PUT("/user", middleware.Token(dependencies), userControllers.Update(dependencies))
 	r.DELETE("/user", middleware.Token(dependencies), userControllers.Delete(dependencies))
